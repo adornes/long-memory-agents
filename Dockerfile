@@ -16,10 +16,9 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Copy project files
 COPY pyproject.toml .
-COPY .env .
 
 # Install dependencies using uv
-RUN uv pip install -e .
+RUN uv sync
 
 # Copy the rest of the application
 COPY . .
