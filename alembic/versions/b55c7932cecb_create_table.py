@@ -27,10 +27,18 @@ def upgrade() -> None:
     op.create_table(
         'chat',
         sa.Column('id', sa.BigInteger, primary_key=True, autoincrement=True),
+        sa.Column('uuid_work', sa.UUID, nullable=False),
+        sa.Column('uuid_lead', sa.UUID, nullable=False),
+        sa.Column('timestamp', sa.TIMESTAMP, server_default=sa.func.now(), nullable=False),
         sa.Column('role', sa.String(10)),
         sa.Column('message', sa.Text),
         sa.Column('embedding_vector', Vector(1536), nullable=False)
     )
+
+    # Create indexes for uuid_work, uuid_lead, and both together
+    op.create_index('ix_chat_uuid_work', 'chat', ['uuid_work'])
+    op.create_index('ix_chat_uuid_lead', 'chat', ['uuid_lead'])
+    op.create_index('ix_chat_uuid_work_uuid_lead', 'chat', ['uuid_work', 'uuid_lead'])
 
 
 def downgrade() -> None:

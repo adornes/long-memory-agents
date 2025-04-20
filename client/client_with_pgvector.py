@@ -3,6 +3,7 @@ import os
 import sys
 import asyncio
 import argparse
+import uuid
 from langchain.embeddings import OpenAIEmbeddings
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
@@ -46,7 +47,7 @@ embeddings = OpenAIEmbeddings()
 
 
 # Define an async function to process chunks from the agent
-async def process_chunks(chunk):
+async def process_chunks(chunk, uuid_work, uuid_lead):
     """
     Asynchronously processes a chunk from the agent and displays information about tool calls or the agent's answer.
 
@@ -101,7 +102,7 @@ async def process_chunks(chunk):
                 agent_answer_embedding = embeddings_response
 
                 # Insert the agent's answer and its embedding vector into the database
-                await persist_message("agent", agent_answer, agent_answer_embedding)
+                await persist_message(uuid_work, uuid_lead, "agent", agent_answer, agent_answer_embedding)
 
                 # Display the agent's answer
                 rich.print(f"\nAgent:\n{agent_answer}", style="black on white")
@@ -120,11 +121,13 @@ def connection_pool():
     )
 
 
-async def persist_message(role, text, embeddings):
+async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
     """
     Inserts a message and its embedding vector into the database.
 
     Parameters:
+        uuid_work (str): The UUID of the work associated with the message.
+        uuid_lead (str): The UUID of the lead associated with the message.
         role (str): The role of the message sender (e.g., 'user', 'agent').
         text (str): The message text.
         embeddings (vector): The embedding vector of the message.
@@ -132,10 +135,15 @@ async def persist_message(role, text, embeddings):
     Returns:
         None
     """
+    from datetime import datetime
+    current_timestamp = datetime.now()
     async with connection_pool() as pool, pool.connection() as conn:
         await conn.execute(
-            "INSERT INTO chat (role, message, embedding_vector) VALUES (%s, %s, %s)",
+            "INSERT INTO chat (uuid_work, uuid_lead, timestamp, role, message, embedding_vector) VALUES (%s, %s, %s, %s, %s, %s)",
             (
+                uuid_work,
+                uuid_lead,
+                current_timestamp,
                 role,
                 text,
                 embeddings
@@ -143,7 +151,7 @@ async def persist_message(role, text, embeddings):
         )
 
 
-async def similarity_search(message_embedding, similarity_search_threshold, similarity_search_limit):
+async def similarity_search(message_embedding, similarity_search_threshold, similarity_search_limit, uuid_work, uuid_lead):
     """
     Performs a similarity search in the database to find the most similar past messages.
 
@@ -151,6 +159,8 @@ async def similarity_search(message_embedding, similarity_search_threshold, simi
         message_embedding (vector): The embedding vector of the message.
         similarity_search_threshold (float): The threshold of cosine similarity to return from similarity search.
         similarity_search_limit (int): The limit of results to return from similarity search.
+        uuid_work (str): The UUID of the work associated with the message.
+        uuid_lead (str): The UUID of the lead associated with the message.
 
     Returns:
         list: A list of tuples containing the message and its cosine similarity.
@@ -168,6 +178,8 @@ async def similarity_search(message_embedding, similarity_search_threshold, simi
                     ) as rn
                 FROM chat
                 WHERE 1 - (embedding_vector <=> %s::vector) >= %s
+                AND uuid_work = %s
+                AND uuid_lead = %s
             )
             SELECT message, cosine_similarity
             FROM ranked_messages 
@@ -180,6 +192,8 @@ async def similarity_search(message_embedding, similarity_search_threshold, simi
                 message_embedding,
                 message_embedding,
                 similarity_search_threshold,
+                uuid_work,
+                uuid_lead,
                 similarity_search_limit
             )
         )
@@ -217,6 +231,13 @@ async def main():
     # Create a LangGraph agent
     langgraph_agent = create_react_agent(model=llm, tools=[])  # Tavily removed
 
+    # Get the UUID of the work and the lead
+    uuid_work = input("Enter the UUID of the work: ") or str(uuid.uuid4())
+    uuid_lead = input("Enter the UUID of the lead: ") or str(uuid.uuid4())
+
+    print(f"UUID of the work: {uuid_work}")
+    print(f"UUID of the lead: {uuid_lead}")
+
     # Loop until the user chooses to quit the chat
     while True:
         # Get the user's question and display it in the terminal
@@ -236,13 +257,15 @@ async def main():
         user_question_embedding = embeddings_response
 
         # Insert the user's question and its embedding vector into the database
-        await persist_message("user", user_question, user_question_embedding)
+        await persist_message(uuid_work, uuid_lead, "user", user_question, user_question_embedding)
 
         # Fetch the similarity search results
         similarity_search_results = await similarity_search(
             user_question_embedding,
             args.similarity_search_threshold,
-            args.similarity_search_limit
+            args.similarity_search_limit,
+            uuid_work,
+            uuid_lead
         )
 
         rich.print(
@@ -322,7 +345,7 @@ async def main():
         # Use the async stream method of the LangGraph agent to get the agent's answer
         async for chunk in langgraph_agent.astream({"messages": messages}):
             # Process the chunks from the agent
-            await process_chunks(chunk)
+            await process_chunks(chunk, uuid_work, uuid_lead)
 
 
 if __name__ == "__main__":
