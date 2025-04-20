@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "alembic>=1.15.2",
     "fastapi>=0.115.12",
     "ipykernel>=6.29.5",
     "ipython>=9.1.0",
@@ -15,6 +16,7 @@ dependencies = [
     "pgvector>=0.4.0",
     "psycopg-pool>=3.2.6",
     "psycopg2>=2.9.10",
+    "psycopg2-binary>=2.9.10",
     "psycopg[binary]>=3.2.6",
     "pydantic>=2.11.3",
     "python-dotenv>=1.1.0",

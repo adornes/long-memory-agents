@@ -25,3 +25,10 @@ Dockerfile
 # Project specific
 *.log
 .DS_Store 
+
+# Alembic
+alembic/
+
+# Environment variables
+.env
+alembic/.env

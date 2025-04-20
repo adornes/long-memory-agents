@@ -57,3 +57,27 @@ The API will be available at the same URLs as in local development.
 - Dependencies are managed through `pyproject.toml`
 - Environment variables are loaded from `.env`
 - CORS is enabled for all origins in development (should be restricted in production)
+
+## Database Migrations with Alembic
+
+To handle database migrations, we use Alembic. Follow these steps to apply migrations:
+
+1. **Initialize Alembic** (already done):
+
+   ```bash
+   uv run -- alembic init alembic
+   ```
+
+2. **Create a new migration**:
+
+   ```bash
+   uv run -- alembic revision -m "Your migration message"
+   ```
+
+3. **Apply the migration**:
+
+   ```bash
+   uv run -- alembic upgrade head
+   ```
+
+Ensure your `DATABASE_URL` environment variable is set correctly to connect to your database.

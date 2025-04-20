@@ -125,26 +125,6 @@ def connection_pool():
         },
     )
 
-async def setup_database():
-    async with connection_pool() as pool, pool.connection() as conn:
-        # Register the vector data type with the database connection
-        await register_vector_async(conn)
-
-        # Enable the pgvector extension in the database if it's not already enabled
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-
-        # Create a table in the database if it's not already created
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS chat (
-                id bigserial PRIMARY KEY,
-                role varchar(10),
-                message text,
-                embedding_vector vector(1536)
-            )
-            """
-        )
-
 async def persist_message(role, text, embeddings):
     """
     Inserts a message and its embedding vector into the database.
@@ -194,9 +174,6 @@ async def main():
     - "threshold": Returns all past messages that have a cosine similarity equal to or greater than 0.75 to the latest user message.
     """
 
-    # Setup the database
-    await setup_database()
-    
     # Connect to the PostgreSQL database using an async connection pool
     async with connection_pool() as pool, pool.connection() as conn:
 

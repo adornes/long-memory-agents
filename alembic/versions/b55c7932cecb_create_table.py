@@ -1,0 +1,38 @@
+"""create_table
+
+Revision ID: b55c7932cecb
+Revises: 
+Create Date: 2025-04-20 15:24:25.695831
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+from pgvector.sqlalchemy import Vector
+
+
+# revision identifiers, used by Alembic.
+revision: str = 'b55c7932cecb'
+down_revision: Union[str, None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    # Enable the pgvector extension if not already enabled
+    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+
+    # Create the chat table if it does not exist
+    op.create_table(
+        'chat',
+        sa.Column('id', sa.BigInteger, primary_key=True, autoincrement=True),
+        sa.Column('role', sa.String(10)),
+        sa.Column('message', sa.Text),
+        sa.Column('embedding_vector', Vector(1536), nullable=False)
+    )
+
+
+def downgrade() -> None:
+    op.drop_table('chat')
+    op.execute("DROP EXTENSION IF EXISTS vector")
