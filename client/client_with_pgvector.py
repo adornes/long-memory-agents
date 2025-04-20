@@ -17,19 +17,20 @@ from rich.console import Console
 parser = argparse.ArgumentParser(description="Choose similarity search type.")
 
 parser.add_argument(
-    "--similarity-search-type",
-    choices=["limit", "threshold"],
-    required=True,
-    help="Type of similarity search to perform.",
+    "--similarity-search-threshold",
+    default=0.75,
+    required=False,    
+    help="Threshold of cosine similarity to return from similarity search.",
+)
+
+parser.add_argument(
+    "--similarity-search-limit",
+    default=5,
+    required=False,    
+    help="Limit of results to return from similarity search.",
 )
 
 args = parser.parse_args()
-
-# Set similarity search type from the terminal argument
-if args.similarity_search_type == "limit":
-    similarity_search_type = "limit"
-elif args.similarity_search_type == "threshold":
-    similarity_search_type = "threshold"
 
 # Initialize dotenv to load environment variables
 load_dotenv()
@@ -201,71 +202,38 @@ async def main():
             # Insert the user's question and its embedding vector into the database
             await persist_message("user", user_question, user_question_embedding)
 
-            # Perform similarity search based on the choosen similarity search type
-            # If similarity_search_type is "limit"
-            if similarity_search_type == "limit":
-                # Return the top 5 most similar past messages (i.e., user questions or LangGraph agent answers) from PostgreSQL with the highest cosine similarity
-                # Cosine similarity is calculated against the embedding vector of the latest user message
-                # Duplicates are removed by selecting only the first occurrence of each message
-                # Results are ordered from most to least similar
-                similarity_search = await conn.execute(
-                    """
-                    WITH ranked_messages AS (
-                        SELECT 
-                            message,
-                            1 - (embedding_vector <=> %s::vector) AS cosine_similarity,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY message 
-                                ORDER BY 1 - (embedding_vector <=> %s::vector) DESC
-                            ) as rn
-                        FROM chat
-                    )
-                    SELECT message, cosine_similarity
-                    FROM ranked_messages 
-                    WHERE rn = 1 
-                    ORDER BY cosine_similarity DESC
-                    LIMIT 5;
-                    """,
-                    (
-                        user_question_embedding,
-                        user_question_embedding,
-                    ),
+        
+            # Return the top 5 most similar past messages (i.e., user questions or LangGraph agent answers) from PostgreSQL with the highest cosine similarity
+            # Cosine similarity is calculated against the embedding vector of the latest user message
+            # Duplicates are removed by selecting only the first occurrence of each message
+            # Results are ordered from most to least similar
+            similarity_search = await conn.execute(
+                """
+                WITH ranked_messages AS (
+                    SELECT 
+                        message,
+                        1 - (embedding_vector <=> %s::vector) AS cosine_similarity,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY message 
+                            ORDER BY 1 - (embedding_vector <=> %s::vector) DESC
+                        ) as rn
+                    FROM chat
+                    WHERE 1 - (embedding_vector <=> %s::vector) >= %s
                 )
-
-            # If similarity_search_type is "threshold"
-            elif similarity_search_type == "threshold":
-                # Return all past messages (i.e., user questions or LangGraph agent answers) from PostgreSQL with a cosine similarity equal to or greater than 0.75
-                # Cosine similarity is calculated against the embedding vector of the latest user message
-                # Duplicates are removed by selecting only the first occurrence of each message
-                # Results are ordered from most to least similar
-                similarity_search = await conn.execute(
-                    """
-                    WITH ranked_messages AS (
-                        SELECT 
-                            message,
-                            1 - (embedding_vector <=> %s::vector) AS cosine_similarity,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY message 
-                                ORDER BY 1 - (embedding_vector <=> %s::vector) DESC
-                            ) as rn
-                        FROM chat
-                        WHERE 1 - (embedding_vector <=> %s::vector) >= %s
-                    )
-                    SELECT message, cosine_similarity
-                    FROM ranked_messages 
-                    WHERE rn = 1 
-                    ORDER BY cosine_similarity DESC;
-                    """,
-                    (
-                        user_question_embedding,
-                        user_question_embedding,
-                        user_question_embedding,
-                        0.75,  # Cosine similarity threshold (ranges from -1 to 1):
-                        # -1: Vectors point in opposite directions (completely dissimilar)
-                        #  0: Vectors are perpendicular (no similarity)
-                        #  1: Vectors point in same direction (identical similarity)
-                    ),
-                )
+                SELECT message, cosine_similarity
+                FROM ranked_messages 
+                WHERE rn = 1 
+                ORDER BY cosine_similarity DESC
+                LIMIT %s;
+                """,
+                (
+                    user_question_embedding,
+                    user_question_embedding,
+                    user_question_embedding,
+                    args.similarity_search_threshold,
+                    args.similarity_search_limit
+                ),
+            )
 
             # Fetch the similarity search results
             similarity_search_results = await similarity_search.fetchall()
@@ -281,17 +249,10 @@ async def main():
                 style="deep_sky_blue1",
             )
 
-            if similarity_search_type == "limit":
-                rich.print(
-                    f"Here are the top 5 most similar past messages with the highest cosine similarity to the latest user's question:",
-                    style="deep_sky_blue1",
-                )
-
-            elif similarity_search_type == "threshold":
-                rich.print(
-                    f"Here are the {len(similarity_search_results)} past messages with a cosine similarity equal to or greater than 0.75 to the latest user's question:",
-                    style="deep_sky_blue1",
-                )
+            rich.print(
+                f"Here are the top {args.similarity_search_limit} most similar past messages with a cosine similarity equal to or greater than {args.similarity_search_threshold} to the latest user's question:",
+                style="deep_sky_blue1",
+            )
 
             for i, query_result in enumerate(similarity_search_results):
                 rich.print(
