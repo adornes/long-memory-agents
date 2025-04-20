@@ -98,7 +98,7 @@ async def process_chunks(chunk, conn):
                 embeddings_response = embeddings.embed_query(agent_answer)
 
                 # Retrieve the embedding vector for the agent's answer from the Embed LLM response
-                agent_answer_embedding = embeddings_response #.data[0].embedding
+                agent_answer_embedding = embeddings_response
 
                 # Insert the agent's answer and its embedding vector into the database
                 await conn.execute(
@@ -113,6 +113,37 @@ async def process_chunks(chunk, conn):
                 # Display the agent's answer
                 rich.print(f"\nAgent:\n{agent_answer}", style="black on white")
 
+def connection_pool():
+    return AsyncConnectionPool(
+        # The format of the connection string is as follows:
+        conninfo=os.getenv('DATABASE_URL'),
+        max_size=20,  # Maximum number of connections in the pool
+        kwargs={
+            "autocommit": True,
+            "prepare_threshold": 0,
+            "row_factory": dict_row,
+        },
+    )
+
+async def setup_database():
+    async with connection_pool() as pool, pool.connection() as conn:
+        # Register the vector data type with the database connection
+        await register_vector_async(conn)
+
+        # Enable the pgvector extension in the database if it's not already enabled
+        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+
+        # Create a table in the database if it's not already created
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat (
+                id bigserial PRIMARY KEY,
+                role varchar(10),
+                message text,
+                embedding_vector vector(1536)
+            )
+            """
+        )
 
 # Define an async function to chat with the agent
 async def main():
@@ -141,34 +172,11 @@ async def main():
     - "threshold": Returns all past messages that have a cosine similarity equal to or greater than 0.75 to the latest user message.
     """
 
+    # Setup the database
+    await setup_database()
+    
     # Connect to the PostgreSQL database using an async connection pool
-    async with AsyncConnectionPool(
-        # The format of the connection string is as follows:
-        conninfo=os.getenv('DATABASE_URL'),
-        max_size=20,  # Maximum number of connections in the pool
-        kwargs={
-            "autocommit": True,
-            "prepare_threshold": 0,
-            "row_factory": dict_row,
-        },
-    ) as pool, pool.connection() as conn:
-        # Register the vector data type with the database connection
-        await register_vector_async(conn)
-
-        # Enable the pgvector extension in the database if it's not already enabled
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-
-        # Create a table in the database if it's not already created
-        await conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS chat (
-                id bigserial PRIMARY KEY,
-                role varchar(10),
-                message text,
-                embedding_vector vector(1536)
-            )
-            """
-        )
+    async with connection_pool() as pool, pool.connection() as conn:
 
         # Create a LangGraph agent
         langgraph_agent = create_react_agent(model=llm, tools=[]) # Tavily removed
@@ -189,7 +197,7 @@ async def main():
             embeddings_response = embeddings.embed_query(user_question)
 
             # Retrieve the embedding vector for the user's question from the Embed LLM response
-            user_question_embedding = embeddings_response #.data[0].embedding
+            user_question_embedding = embeddings_response
 
             # Insert the user's question and its embedding vector into the database
             await conn.execute(
