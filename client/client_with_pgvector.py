@@ -145,6 +145,28 @@ async def setup_database():
             """
         )
 
+async def persist_message(role, text, embeddings):
+    """
+    Inserts a message and its embedding vector into the database.
+
+    Parameters:
+        role (str): The role of the message sender (e.g., 'user', 'agent').
+        text (str): The message text.
+        embeddings (vector): The embedding vector of the message.
+
+    Returns:
+        None
+    """
+    async with connection_pool() as pool, pool.connection() as conn:
+        await conn.execute(
+            "INSERT INTO chat (role, message, embedding_vector) VALUES (%s, %s, %s)",
+            (
+                role,
+                text,
+                embeddings,
+            ),
+        )
+
 # Define an async function to chat with the agent
 async def main():
     """
@@ -200,14 +222,7 @@ async def main():
             user_question_embedding = embeddings_response
 
             # Insert the user's question and its embedding vector into the database
-            await conn.execute(
-                "INSERT INTO chat (role, message, embedding_vector) VALUES (%s, %s, %s)",
-                (
-                    "user",
-                    user_question,
-                    user_question_embedding,
-                ),
-            )
+            await persist_message("user", user_question, user_question_embedding)
 
             # Perform similarity search based on the choosen similarity search type
             # If similarity_search_type is "limit"
