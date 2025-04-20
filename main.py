@@ -1,9 +1,18 @@
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from datetime import datetime
+import os
+import sys
+import uuid
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-import sys
-import os
-from dotenv import load_dotenv
+from pydantic import BaseModel
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
+
+from database.db import Database
 
 # Load environment variables
 load_dotenv()
@@ -41,12 +50,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize database
+database = Database()
+
+# Pydantic models for request bodies
+class PersistMessageRequest(BaseModel):
+    uuid_work: str
+    uuid_lead: str
+    role: str
+    text: str
+    embeddings: list
+
+class SimilaritySearchRequest(BaseModel):
+    message_embedding: list
+    similarity_search_threshold: float
+    similarity_search_limit: int
+    uuid_work: str
+    uuid_lead: str
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     logger.info("Health check endpoint called")
     return {"status": "healthy"}
 
+# FastAPI endpoints
+@app.post("/persist_message")
+async def persist_message_endpoint(request: PersistMessageRequest):
+    try:
+        await database.persist_message(
+            request.uuid_work,
+            request.uuid_lead,
+            request.role,
+            request.text,
+            request.embeddings
+        )
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error persisting message: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@app.post("/similarity_search")
+async def similarity_search_endpoint(request: SimilaritySearchRequest):
+    try:
+        results = await database.similarity_search(
+            request.message_embedding,
+            request.similarity_search_threshold,
+            request.similarity_search_limit,
+            request.uuid_work,
+            request.uuid_lead
+        )
+        return {"results": results}
+    except Exception as e:
+        logger.error(f"Error performing similarity search: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,17 +1,15 @@
 # Imports
-import os
-import sys
-import asyncio
 import argparse
+import asyncio
+import sys
 import uuid
-from langchain.embeddings import OpenAIEmbeddings
+
+import httpx
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from psycopg_pool import AsyncConnectionPool
-from psycopg.rows import dict_row
-from pgvector.psycopg import register_vector_async
-from langgraph.prebuilt import create_react_agent
+from langchain.embeddings import OpenAIEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.prebuilt import create_react_agent
 from rich.console import Console
 
 # Parse terminal argument to choose similarity search type
@@ -45,6 +43,8 @@ llm = init_chat_model("openai:gpt-4o-mini")
 # Initialize the embeddings model
 embeddings = OpenAIEmbeddings()
 
+# Define the base URL for the FastAPI server
+API_BASE_URL = "http://localhost:8000"
 
 # Define an async function to process chunks from the agent
 async def process_chunks(chunk, uuid_work, uuid_lead):
@@ -108,22 +108,9 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                 rich.print(f"\nAgent:\n{agent_answer}", style="black on white")
 
 
-def connection_pool():
-    return AsyncConnectionPool(
-        # The format of the connection string is as follows:
-        conninfo=os.getenv('DATABASE_URL'),
-        max_size=20,  # Maximum number of connections in the pool
-        kwargs={
-            "autocommit": True,
-            "prepare_threshold": 0,
-            "row_factory": dict_row
-        }
-    )
-
-
 async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
     """
-    Inserts a message and its embedding vector into the database.
+    Sends a request to the FastAPI endpoint to persist a message.
 
     Parameters:
         uuid_work (str): The UUID of the work associated with the message.
@@ -135,25 +122,20 @@ async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
     Returns:
         None
     """
-    from datetime import datetime
-    current_timestamp = datetime.now()
-    async with connection_pool() as pool, pool.connection() as conn:
-        await conn.execute(
-            "INSERT INTO chat (uuid_work, uuid_lead, timestamp, role, message, embedding_vector) VALUES (%s, %s, %s, %s, %s, %s)",
-            (
-                uuid_work,
-                uuid_lead,
-                current_timestamp,
-                role,
-                text,
-                embeddings
-            )
-        )
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{API_BASE_URL}/persist_message", json={
+            "uuid_work": uuid_work,
+            "uuid_lead": uuid_lead,
+            "role": role,
+            "text": text,
+            "embeddings": embeddings
+        })
+        response.raise_for_status()
 
 
 async def similarity_search(message_embedding, similarity_search_threshold, similarity_search_limit, uuid_work, uuid_lead):
     """
-    Performs a similarity search in the database to find the most similar past messages.
+    Sends a request to the FastAPI endpoint to perform a similarity search.
 
     Parameters:
         message_embedding (vector): The embedding vector of the message.
@@ -165,47 +147,22 @@ async def similarity_search(message_embedding, similarity_search_threshold, simi
     Returns:
         list: A list of tuples containing the message and its cosine similarity.
     """
-    async with connection_pool() as pool, pool.connection() as conn:
-        similarity_search = await conn.execute(
-            """
-            WITH ranked_messages AS (
-                SELECT 
-                    message,
-                    1 - (embedding_vector <=> %s::vector) AS cosine_similarity,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY message 
-                        ORDER BY 1 - (embedding_vector <=> %s::vector) DESC
-                    ) as rn
-                FROM chat
-                WHERE 1 - (embedding_vector <=> %s::vector) >= %s
-                AND uuid_work = %s
-                AND uuid_lead = %s
-            )
-            SELECT message, cosine_similarity
-            FROM ranked_messages 
-            WHERE rn = 1 
-            ORDER BY cosine_similarity DESC
-            LIMIT %s;
-            """,
-            (
-                message_embedding,
-                message_embedding,
-                message_embedding,
-                similarity_search_threshold,
-                uuid_work,
-                uuid_lead,
-                similarity_search_limit
-            )
-        )
-
-        return await similarity_search.fetchall()
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{API_BASE_URL}/similarity_search", json={
+            "message_embedding": message_embedding,
+            "similarity_search_threshold": similarity_search_threshold,
+            "similarity_search_limit": similarity_search_limit,
+            "uuid_work": uuid_work,
+            "uuid_lead": uuid_lead
+        })
+        response.raise_for_status()
+        return response.json()["results"]
 
 
 # Define an async function to chat with the agent
 async def main():
     """
-    Entry point of the application. Connects to a PostgreSQL database, initializes a persistent chat memory utilizing pgvector,
-    creates a LangGraph agent, and handles user interaction in a loop until the user chooses to quit.
+    Entry point of the application. Initializes a persistent chat memory, creates a LangGraph agent, and handles user interaction in a loop until the user chooses to quit.
 
     Parameters:
         None
@@ -214,10 +171,9 @@ async def main():
         None
 
     This function performs the following steps:
-    1. Connects to the PostgreSQL database using an async connection pool.
-    2. Initializes a persistent chat memory utilizing pgvector.
-    3. Creates a LangGraph agent with the specified model and tools.
-    4. Enters a loop to interact with the user:
+    1. Initializes a persistent chat memory.
+    2. Creates a LangGraph agent with the specified model and tools.
+    3. Enters a loop to interact with the user:
         - Prompts the user for a question.
         - Checks if the user wants to quit.
         - Uses the LangGraph agent to get the agent's answer.
