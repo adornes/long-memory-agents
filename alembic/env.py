@@ -8,7 +8,7 @@ import os
 from alembic import context
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
