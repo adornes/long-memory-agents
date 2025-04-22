@@ -7,8 +7,8 @@ import uuid
 import httpx
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain_openai import OpenAIEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import OpenAIEmbeddings
 from langgraph.prebuilt import create_react_agent
 from rich.console import Console
 
@@ -19,14 +19,14 @@ parser.add_argument(
     "--similarity-search-threshold",
     default=0.75,
     required=False,
-    help="Threshold of cosine similarity to return from similarity search."
+    help="Threshold of cosine similarity to return from similarity search.",
 )
 
 parser.add_argument(
     "--similarity-search-limit",
     default=5,
     required=False,
-    help="Limit of results to return from similarity search."
+    help="Limit of results to return from similarity search.",
 )
 
 args = parser.parse_args()
@@ -45,6 +45,7 @@ embeddings = OpenAIEmbeddings()
 
 # Define the base URL for the FastAPI server
 API_BASE_URL = "http://localhost:8000"
+
 
 # Define an async function to process chunks from the agent
 async def process_chunks(chunk, uuid_work, uuid_lead):
@@ -87,7 +88,7 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                     # Display an informative message with tool call details
                     rich.print(
                         f"\nThe agent is calling the tool [on deep_sky_blue1]{tool_name}[/on deep_sky_blue1] with the query [on deep_sky_blue1]{tool_query}[/on deep_sky_blue1]. Please wait for the agent's answer[deep_sky_blue1]...[/deep_sky_blue1]",
-                        style="deep_sky_blue1"
+                        style="deep_sky_blue1",
                     )
             else:
                 # If the message doesn't contain tool calls, extract and display the agent's answer
@@ -102,10 +103,34 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                 agent_answer_embedding = embeddings_response
 
                 # Insert the agent's answer and its embedding vector into the database
-                await persist_message(uuid_work, uuid_lead, "agent", agent_answer, agent_answer_embedding)
+                await persist_message(
+                    uuid_work, uuid_lead, "agent", agent_answer, agent_answer_embedding
+                )
 
                 # Display the agent's answer
                 rich.print(f"\nAgent:\n{agent_answer}", style="black on white")
+
+
+async def print_similar_messages(similarity_search_results):
+    rich.print("\n============================================================\n")
+
+    # Display all similarity search result messages
+    # Those will be passed to the LangGraph agent as the system message
+    rich.print(
+        "[on deep_sky_blue1]Similarity search results:[/on deep_sky_blue1]",
+        style="deep_sky_blue1",
+    )
+
+    rich.print(
+        f"Here are the top {args.similarity_search_limit} most similar past messages with a cosine similarity equal to or greater than {args.similarity_search_threshold} to the latest user's question:",
+        style="deep_sky_blue1",
+    )
+
+    for i, query_result in enumerate(similarity_search_results):
+        rich.print(
+            f"Message #{i+1} (cosine similarity = {query_result['cosine_similarity']:.2f}): {query_result['message']}",
+            style="deep_sky_blue1",
+        )
 
 
 async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
@@ -123,17 +148,27 @@ async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
         None
     """
     async with httpx.AsyncClient() as client:
-        response = await client.post(f"{API_BASE_URL}/persist_message", json={
-            "uuid_work": uuid_work,
-            "uuid_lead": uuid_lead,
-            "role": role,
-            "text": text,
-            "embeddings": embeddings
-        })
+        response = await client.post(
+            f"{API_BASE_URL}/persist_message",
+            json={
+                "uuid_work": uuid_work,
+                "uuid_lead": uuid_lead,
+                "role": role,
+                "text": text,
+                "embeddings": embeddings,
+            },
+        )
         response.raise_for_status()
 
 
-async def similarity_search(message_embedding, similarity_search_threshold, similarity_search_limit, uuid_work, uuid_lead):
+async def similarity_search(
+    message_embedding,
+    similarity_search_threshold,
+    similarity_search_limit,
+    uuid_work,
+    uuid_lead,
+    verbose=False,
+):
     """
     Sends a request to the FastAPI endpoint to perform a similarity search.
 
@@ -143,20 +178,70 @@ async def similarity_search(message_embedding, similarity_search_threshold, simi
         similarity_search_limit (int): The limit of results to return from similarity search.
         uuid_work (str): The UUID of the work associated with the message.
         uuid_lead (str): The UUID of the lead associated with the message.
-
+        verbose (bool): Whether to print the similarity search results.
     Returns:
         list: A list of tuples containing the message and its cosine similarity.
     """
     async with httpx.AsyncClient() as client:
-        response = await client.post(f"{API_BASE_URL}/similarity_search", json={
-            "message_embedding": message_embedding,
-            "similarity_search_threshold": similarity_search_threshold,
-            "similarity_search_limit": similarity_search_limit,
-            "uuid_work": uuid_work,
-            "uuid_lead": uuid_lead
-        })
+        response = await client.post(
+            f"{API_BASE_URL}/similarity_search",
+            json={
+                "message_embedding": message_embedding,
+                "similarity_search_threshold": similarity_search_threshold,
+                "similarity_search_limit": similarity_search_limit,
+                "uuid_work": uuid_work,
+                "uuid_lead": uuid_lead,
+            },
+        )
         response.raise_for_status()
-        return response.json()["results"]
+
+        similar_messages = response.json()["results"]
+
+        if verbose:
+            print_similar_messages(similar_messages)
+
+        return similar_messages
+
+
+def display_agent_messages(messages):
+    """
+    Displays the system and human messages that will be passed to the LangGraph agent.
+
+    Parameters:
+        messages (list): A list of message objects (SystemMessage and HumanMessage).
+
+    Returns:
+        None
+    """
+    # Initialize the system message and human message
+    system_message = None
+    human_message = None
+
+    # Iterate over the messages and extract the system and human messages
+    for message in messages:
+        if isinstance(message, SystemMessage):
+            system_message = message
+        elif isinstance(message, HumanMessage):
+            human_message = message
+
+    # Display all messages that will be passed to the LangGraph agent
+    rich.print(
+        "[on deep_sky_blue1]\nMessages passed to the LangGraph agent:[/on deep_sky_blue1]",
+        style="deep_sky_blue1",
+    )
+
+    if system_message:
+        rich.print(
+            f"The system message:\n-----------------------\n{system_message.content}",
+            style="deep_sky_blue1",
+        )
+    if human_message:
+        rich.print(
+            f"\nThe human message:\n-----------------------\n{human_message.content}",
+            style="deep_sky_blue1",
+        )
+
+    rich.print("\n============================================================")
 
 
 # Define an async function to chat with the agent
@@ -201,19 +286,11 @@ async def main():
 
         # Check if the user wants to quit the chat
         if user_question.lower() == "quit":
-            rich.print(
-                "\nAgent:\nHave a nice day! :wave:\n", style="black on white"
-            )
+            rich.print("\nAgent:\nHave a nice day! :wave:\n", style="black on white")
             break
 
         # Create the embedding vector for the user's question
-        embeddings_response = embeddings.embed_query(user_question)
-
-        # Retrieve the embedding vector for the user's question from the Embed LLM response
-        user_question_embedding = embeddings_response
-
-        # Insert the user's question and its embedding vector into the database
-        await persist_message(uuid_work, uuid_lead, "user", user_question, user_question_embedding)
+        user_question_embedding = embeddings.embed_query(user_question)
 
         # Fetch the similarity search results
         similarity_search_results = await similarity_search(
@@ -221,41 +298,21 @@ async def main():
             args.similarity_search_threshold,
             args.similarity_search_limit,
             uuid_work,
-            uuid_lead
+            uuid_lead,
+            verbose=True,
         )
 
-        rich.print(
-            "\n============================================================\n"
+        # Insert the user's question and its embedding vector into the database
+        await persist_message(
+            uuid_work, uuid_lead, "user", user_question, user_question_embedding
         )
-
-        # Display all similarity search result messages
-        # Those will be passed to the LangGraph agent as the system message
-        rich.print(
-            "[on deep_sky_blue1]Similarity search results:[/on deep_sky_blue1]",
-            style="deep_sky_blue1"
-        )
-
-        rich.print(
-            f"Here are the top {args.similarity_search_limit} most similar past messages with a cosine similarity equal to or greater than {args.similarity_search_threshold} to the latest user's question:",
-            style="deep_sky_blue1"
-        )
-
-        for i, query_result in enumerate(similarity_search_results):
-            rich.print(
-                f"Message #{i+1} (cosine similarity = {query_result['cosine_similarity']:.2f}): {query_result['message']}",
-                style="deep_sky_blue1"
-            )
 
         # Prepare messages (i.e., human and system messages) to be passed to the LangGraph agent
         # Add the user's question to the HumanMessage object
         messages = [HumanMessage(content=user_question)]
 
         # Create a list to store the messages
-        similar_messages = []
-
-        # Iterate over the similarity search results and add them to the list
-        for query_result in similarity_search_results:
-            similar_messages.append(query_result["message"])
+        similar_messages = [_["message"] for _ in similarity_search_results]
 
         # If there are similar messages returned from the similarity search, add them to the SystemMessage object
         if len(similar_messages) > 0:
@@ -265,38 +322,8 @@ async def main():
             system_message = f"To answer the user's question, use this information which is part of the past conversation as a context:\n{join_similar_messages}"
             messages.insert(0, SystemMessage(content=system_message))
 
-        # Initialize the system message and human message
-        system_message = None
-        human_message = None
-
-        # Iterate over the messages and extract the system and human messages
-        for message in messages:
-            # Check if the message is a system message
-            if isinstance(message, SystemMessage):
-                system_message = message
-
-            # Check if the message is a human message
-            elif isinstance(message, HumanMessage):
-                human_message = message
-
-        # Display all messages that will be passed to the LangGraph agent (system and human messages)
-        rich.print(
-            "[on deep_sky_blue1]\nMessages passed to the LangGraph agent:[/on deep_sky_blue1]",
-            style="deep_sky_blue1"
-        )
-
-        if system_message:
-            rich.print(
-                f"The system message:\n-----------------------\n{system_message.content}",
-                style="deep_sky_blue1"
-            )
-        if human_message:
-            rich.print(
-                f"\nThe human message:\n-----------------------\n{human_message.content}",
-                style="deep_sky_blue1"
-            )
-
-        rich.print("\n============================================================")
+        # Use the new function to prepare and display agent messages
+        display_agent_messages(messages)
 
         # Use the async stream method of the LangGraph agent to get the agent's answer
         async for chunk in langgraph_agent.astream({"messages": messages}):
