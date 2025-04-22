@@ -7,7 +7,7 @@ import uuid
 import httpx
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.prebuilt import create_react_agent
 from rich.console import Console
@@ -191,8 +191,8 @@ async def main():
     uuid_work = input("Enter the UUID of the work: ") or str(uuid.uuid4())
     uuid_lead = input("Enter the UUID of the lead: ") or str(uuid.uuid4())
 
-    print(f"UUID of the work: {uuid_work}")
-    print(f"UUID of the lead: {uuid_lead}")
+    rich.print(f"UUID of the work: {uuid_work}", style="magenta")
+    rich.print(f"UUID of the lead: {uuid_lead}", style="magenta")
 
     # Loop until the user chooses to quit the chat
     while True:
