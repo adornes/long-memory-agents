@@ -13,6 +13,9 @@ wheels/
 .env
 alembic/.env
 
+# Database data
+data/
+
 # Project specific
 *.log
 .DS_Store 

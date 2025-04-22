@@ -44,6 +44,12 @@ docker build -t long-memory-agents .
 docker run -p 8000:8000 long-memory-agents
 ```
 
+3. Run the application using docker-compose (this will also spin up the Vector DB):
+
+```bash
+docker-compose up
+```
+
 The API will be available at the same URLs as in local development.
 
 ## API Endpoints

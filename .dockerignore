@@ -29,6 +29,12 @@ Dockerfile
 # Alembic
 alembic/
 
+# API client code
+client/
+
+# Database data
+data/
+
 # Environment variables
 .env
 alembic/.env
