@@ -11,6 +11,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import OpenAIEmbeddings
 from langgraph.prebuilt import create_react_agent
 from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 # Parse terminal argument to choose similarity search type
 parser = argparse.ArgumentParser(description="Choose similarity search type.")
@@ -112,25 +114,29 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
 
 
 async def print_similar_messages(similarity_search_results):
-    rich.print("\n============================================================\n")
-
     # Display all similarity search result messages
     # Those will be passed to the LangGraph agent as the system message
-    rich.print(
-        "[on deep_sky_blue1]Similarity search results:[/on deep_sky_blue1]",
-        style="deep_sky_blue1",
-    )
 
-    rich.print(
-        f"Here are the top {args.similarity_search_limit} most similar past messages with a cosine similarity equal to or greater than {args.similarity_search_threshold} to the latest user's question:",
-        style="deep_sky_blue1",
+    # Create a Rich table to display similarity search results
+    table = Table(title="Similarity Search Results")
+    table.add_column("#", justify="right", style="cyan", no_wrap=True)
+    table.add_column(
+        f"Cosine Similarity (>{args.similarity_search_threshold})",
+        justify="right",
+        style="magenta",
     )
+    table.add_column("Message", style="green")
 
+    # Add rows to the table for each similarity search result
     for i, query_result in enumerate(similarity_search_results):
-        rich.print(
-            f"Message #{i+1} (cosine similarity = {query_result['cosine_similarity']:.2f}): {query_result['message']}",
-            style="deep_sky_blue1",
+        table.add_row(
+            str(i + 1),
+            f"{query_result['cosine_similarity']:.2f}",
+            query_result["message"],
         )
+
+    # Print the table using Rich
+    rich.print(table)
 
 
 async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
@@ -198,7 +204,7 @@ async def similarity_search(
         similar_messages = response.json()["results"]
 
         if verbose:
-            print_similar_messages(similar_messages)
+            await print_similar_messages(similar_messages)
 
         return similar_messages
 
@@ -232,16 +238,20 @@ def display_agent_messages(messages):
 
     if system_message:
         rich.print(
-            f"The system message:\n-----------------------\n{system_message.content}",
-            style="deep_sky_blue1",
+            Panel.fit(
+                system_message.content,
+                title="System message",
+                border_style="deep_sky_blue1",
+            )
         )
     if human_message:
         rich.print(
-            f"\nThe human message:\n-----------------------\n{human_message.content}",
-            style="deep_sky_blue1",
+            Panel.fit(
+                human_message.content,
+                title="Human message",
+                border_style="deep_sky_blue1",
+            )
         )
-
-    rich.print("\n============================================================")
 
 
 # Define an async function to chat with the agent
@@ -276,8 +286,16 @@ async def main():
     uuid_work = input("Enter the UUID of the work: ") or str(uuid.uuid4())
     uuid_lead = input("Enter the UUID of the lead: ") or str(uuid.uuid4())
 
-    rich.print(f"UUID of the work: {uuid_work}", style="magenta")
-    rich.print(f"UUID of the lead: {uuid_lead}", style="magenta")
+    print("\n")
+
+    # Display the UUIDs in a panel
+    rich.print(
+        Panel.fit(
+            f"UUID of the work: [red]{uuid_work}[/red]\nUUID of the lead: [red]{uuid_lead}[/red]",
+            title="UUIDs",
+            border_style="magenta",
+        )
+    )
 
     # Loop until the user chooses to quit the chat
     while True:
