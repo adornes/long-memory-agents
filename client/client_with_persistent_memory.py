@@ -238,6 +238,7 @@ async def display_agent_messages(messages):
                 )
 
     # Display all messages that will be passed to the LangGraph agent
+    print("\n")
     console.print(
         Panel(
             get_panels(),
