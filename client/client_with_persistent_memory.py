@@ -203,7 +203,7 @@ async def similarity_search(
 
         similar_messages = response.json()["results"]
 
-        if verbose:
+        if verbose and len(similar_messages) > 0:
             await print_similar_messages(similar_messages)
 
         return similar_messages
