@@ -1,19 +1,19 @@
 """create_table
 
 Revision ID: b55c7932cecb
-Revises: 
+Revises:
 Create Date: 2025-04-20 15:24:25.695831
 
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 from pgvector.sqlalchemy import Vector
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'b55c7932cecb'
+revision: str = "b55c7932cecb"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,22 +25,24 @@ def upgrade() -> None:
 
     # Create the chat table if it does not exist
     op.create_table(
-        'chat',
-        sa.Column('id', sa.BigInteger, primary_key=True, autoincrement=True),
-        sa.Column('uuid_work', sa.UUID, nullable=False),
-        sa.Column('uuid_lead', sa.UUID, nullable=False),
-        sa.Column('timestamp', sa.TIMESTAMP, server_default=sa.func.now(), nullable=False),
-        sa.Column('role', sa.String(10)),
-        sa.Column('message', sa.Text),
-        sa.Column('embedding_vector', Vector(1536), nullable=False)
+        "chat",
+        sa.Column("id", sa.BigInteger, primary_key=True, autoincrement=True),
+        sa.Column("uuid_work", sa.UUID, nullable=False),
+        sa.Column("uuid_lead", sa.UUID, nullable=False),
+        sa.Column(
+            "timestamp", sa.TIMESTAMP, server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column("role", sa.String(10)),
+        sa.Column("message", sa.Text),
+        sa.Column("embedding_vector", Vector(1536), nullable=False),
     )
 
     # Create indexes for uuid_work, uuid_lead, and both together
-    op.create_index('ix_chat_uuid_work', 'chat', ['uuid_work'])
-    op.create_index('ix_chat_uuid_lead', 'chat', ['uuid_lead'])
-    op.create_index('ix_chat_uuid_work_uuid_lead', 'chat', ['uuid_work', 'uuid_lead'])
+    op.create_index("ix_chat_uuid_work", "chat", ["uuid_work"])
+    op.create_index("ix_chat_uuid_lead", "chat", ["uuid_lead"])
+    op.create_index("ix_chat_uuid_work_uuid_lead", "chat", ["uuid_work", "uuid_lead"])
 
 
 def downgrade() -> None:
-    op.drop_table('chat')
+    op.drop_table("chat")
     op.execute("DROP EXTENSION IF EXISTS vector")

@@ -24,7 +24,7 @@ Dockerfile
 
 # Project specific
 *.log
-.DS_Store 
+.DS_Store
 
 # Alembic
 alembic/

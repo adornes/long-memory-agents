@@ -12,7 +12,7 @@ services:
       DEBUG: ${DEBUG}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       LOG_LEVEL: ${LOG_LEVEL}
-      LOG_FILE: ${LOG_FILE} 
+      LOG_FILE: ${LOG_FILE}
     depends_on:
       - pgvector
     volumes:
