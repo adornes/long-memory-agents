@@ -209,7 +209,7 @@ async def similarity_search(
         return similar_messages
 
 
-def display_agent_messages(messages):
+async def display_agent_messages(messages):
     """
     Displays the system and human messages that will be passed to the LangGraph agent.
 
@@ -219,39 +219,30 @@ def display_agent_messages(messages):
     Returns:
         None
     """
-    # Initialize the system message and human message
-    system_message = None
-    human_message = None
-
-    # Iterate over the messages and extract the system and human messages
-    for message in messages:
-        if isinstance(message, SystemMessage):
-            system_message = message
-        elif isinstance(message, HumanMessage):
-            human_message = message
-
     # Display all messages that will be passed to the LangGraph agent
     rich.print(
         "[on deep_sky_blue1]\nMessages passed to the LangGraph agent:[/on deep_sky_blue1]",
         style="deep_sky_blue1",
     )
 
-    if system_message:
-        rich.print(
-            Panel.fit(
-                system_message.content,
-                title="System message",
-                border_style="deep_sky_blue1",
+    # Iterate over the messages and print the system and human messages
+    for message in messages:
+        if isinstance(message, SystemMessage):
+            rich.print(
+                Panel.fit(
+                    message.content,
+                    title="System message",
+                    border_style="deep_sky_blue1",
+                )
             )
-        )
-    if human_message:
-        rich.print(
-            Panel.fit(
-                human_message.content,
-                title="Human message",
-                border_style="deep_sky_blue1",
+        elif isinstance(message, HumanMessage):
+            rich.print(
+                Panel.fit(
+                    message.content,
+                    title="Human message",
+                    border_style="deep_sky_blue1",
+                )
             )
-        )
 
 
 # Define an async function to chat with the agent
@@ -279,9 +270,6 @@ async def main():
     - "threshold": Returns all past messages that have a cosine similarity equal to or greater than 0.75 to the latest user message.
     """
 
-    # Create a LangGraph agent
-    langgraph_agent = create_react_agent(model=llm, tools=[])  # Tavily removed
-
     # Get the UUID of the work and the lead
     uuid_work = input("Enter the UUID of the work: ") or str(uuid.uuid4())
     uuid_lead = input("Enter the UUID of the lead: ") or str(uuid.uuid4())
@@ -296,6 +284,9 @@ async def main():
             border_style="magenta",
         )
     )
+
+    # Create a LangGraph agent
+    langgraph_agent = create_react_agent(model=llm, tools=[])  # Tavily removed
 
     # Loop until the user chooses to quit the chat
     while True:
@@ -341,7 +332,7 @@ async def main():
             messages.insert(0, SystemMessage(content=system_message))
 
         # Use the new function to prepare and display agent messages
-        display_agent_messages(messages)
+        await display_agent_messages(messages)
 
         # Use the async stream method of the LangGraph agent to get the agent's answer
         async for chunk in langgraph_agent.astream({"messages": messages}):
