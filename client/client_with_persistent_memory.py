@@ -10,7 +10,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import OpenAIEmbeddings
 from langgraph.prebuilt import create_react_agent
-from rich.console import Console
+from rich.console import Console, group
 from rich.panel import Panel
 from rich.table import Table
 
@@ -37,7 +37,7 @@ args = parser.parse_args()
 load_dotenv()
 
 # Initialize Rich for better output formatting and visualization
-rich = Console()
+console = Console()
 
 # Initialize the LLM
 llm = init_chat_model("openai:gpt-4o-mini")
@@ -88,7 +88,7 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                     tool_query = tool_arguments["query"]
 
                     # Display an informative message with tool call details
-                    rich.print(
+                    console.print(
                         f"\nThe agent is calling the tool [on deep_sky_blue1]{tool_name}[/on deep_sky_blue1] with the query [on deep_sky_blue1]{tool_query}[/on deep_sky_blue1]. Please wait for the agent's answer[deep_sky_blue1]...[/deep_sky_blue1]",
                         style="deep_sky_blue1",
                     )
@@ -110,7 +110,7 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                 )
 
                 # Display the agent's answer
-                rich.print(f"\nAgent:\n{agent_answer}", style="black on white")
+                console.print(f"\nAgent:\n{agent_answer}", style="black on white")
 
 
 async def print_similar_messages(similarity_search_results):
@@ -136,7 +136,7 @@ async def print_similar_messages(similarity_search_results):
         )
 
     # Print the table using Rich
-    rich.print(table)
+    console.print(table)
 
 
 async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
@@ -219,30 +219,32 @@ async def display_agent_messages(messages):
     Returns:
         None
     """
-    # Display all messages that will be passed to the LangGraph agent
-    rich.print(
-        "[on deep_sky_blue1]\nMessages passed to the LangGraph agent:[/on deep_sky_blue1]",
-        style="deep_sky_blue1",
-    )
 
-    # Iterate over the messages and print the system and human messages
-    for message in messages:
-        if isinstance(message, SystemMessage):
-            rich.print(
-                Panel.fit(
+    @group()
+    def get_panels():
+        # Iterate over the messages and print the system and human messages
+        for message in messages:
+            if isinstance(message, SystemMessage):
+                yield Panel.fit(
                     message.content,
                     title="System message",
                     border_style="deep_sky_blue1",
                 )
-            )
-        elif isinstance(message, HumanMessage):
-            rich.print(
-                Panel.fit(
+            elif isinstance(message, HumanMessage):
+                yield Panel.fit(
                     message.content,
                     title="Human message",
                     border_style="deep_sky_blue1",
                 )
-            )
+
+    # Display all messages that will be passed to the LangGraph agent
+    console.print(
+        Panel(
+            get_panels(),
+            title="Messages passed to the LangGraph agent:",
+            border_style="bright_cyan",
+        )
+    )
 
 
 # Define an async function to chat with the agent
@@ -277,7 +279,7 @@ async def main():
     print("\n")
 
     # Display the UUIDs in a panel
-    rich.print(
+    console.print(
         Panel.fit(
             f"UUID of the work: [red]{uuid_work}[/red]\nUUID of the lead: [red]{uuid_lead}[/red]",
             title="UUIDs",
@@ -295,7 +297,7 @@ async def main():
 
         # Check if the user wants to quit the chat
         if user_question.lower() == "quit":
-            rich.print("\nAgent:\nHave a nice day! :wave:\n", style="black on white")
+            console.print("\nAgent:\nHave a nice day! :wave:\n", style="black on white")
             break
 
         # Create the embedding vector for the user's question
