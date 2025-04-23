@@ -22,7 +22,7 @@ class Database:
         async with self.pool.connection() as conn:
             await conn.execute(
                 """
-                INSERT INTO chat (uuid_work, uuid_lead, timestamp, role, message, embedding_vector)
+                INSERT INTO messages (uuid_work, uuid_lead, timestamp, role, message, embedding_vector)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (uuid_work, uuid_lead, current_timestamp, role, text, embeddings),
@@ -47,7 +47,7 @@ class Database:
                             PARTITION BY message
                             ORDER BY 1 - (embedding_vector <=> %s::vector) DESC
                         ) as rn
-                    FROM chat
+                    FROM messages
                     WHERE 1 - (embedding_vector <=> %s::vector) >= %s
                     AND uuid_work = %s
                     AND uuid_lead = %s

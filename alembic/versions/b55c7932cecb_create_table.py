@@ -23,9 +23,9 @@ def upgrade() -> None:
     # Enable the pgvector extension if not already enabled
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    # Create the chat table if it does not exist
+    # Create the messages table if it does not exist
     op.create_table(
-        "chat",
+        "messages",
         sa.Column("id", sa.BigInteger, primary_key=True, autoincrement=True),
         sa.Column("uuid_work", sa.UUID, nullable=False),
         sa.Column("uuid_lead", sa.UUID, nullable=False),
@@ -38,11 +38,13 @@ def upgrade() -> None:
     )
 
     # Create indexes for uuid_work, uuid_lead, and both together
-    op.create_index("ix_chat_uuid_work", "chat", ["uuid_work"])
-    op.create_index("ix_chat_uuid_lead", "chat", ["uuid_lead"])
-    op.create_index("ix_chat_uuid_work_uuid_lead", "chat", ["uuid_work", "uuid_lead"])
+    op.create_index("ix_messages_uuid_work", "messages", ["uuid_work"])
+    op.create_index("ix_messages_uuid_lead", "messages", ["uuid_lead"])
+    op.create_index(
+        "ix_messages_uuid_work_uuid_lead", "messages", ["uuid_work", "uuid_lead"]
+    )
 
 
 def downgrade() -> None:
-    op.drop_table("chat")
+    op.drop_table("messages")
     op.execute("DROP EXTENSION IF EXISTS vector")
