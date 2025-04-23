@@ -113,7 +113,7 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                 console.print(f"\nAgent:\n{agent_answer}", style="black on white")
 
 
-async def print_similar_messages(similarity_search_results):
+async def display_similar_messages(similarity_search_results):
     # Display all similarity search result messages
     # Those will be passed to the LangGraph agent as the system message
 
@@ -204,7 +204,7 @@ async def similarity_search(
         similar_messages = response.json()["results"]
 
         if verbose and len(similar_messages) > 0:
-            await print_similar_messages(similar_messages)
+            await display_similar_messages(similar_messages)
 
         return similar_messages
 
