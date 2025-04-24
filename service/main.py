@@ -6,7 +6,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from db.models.messages import Message
 from service.routes.messages import messages_router
 
 # Load environment variables
@@ -47,9 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize database
-message_db = Message()
-
+# Include the endpoint routers
 app.include_router(messages_router)
 
 

@@ -8,7 +8,6 @@ import httpx
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import OpenAIEmbeddings
 from langgraph.prebuilt import create_react_agent
 from rich.console import Console, group
 from rich.panel import Panel
@@ -42,10 +41,7 @@ console = Console()
 # Initialize the LLM
 llm = init_chat_model("openai:gpt-4o-mini")
 
-# Initialize the embeddings model
-embeddings = OpenAIEmbeddings()
-
-# Define the base URL for the FastAPI server
+# Define the base URL for the API server
 API_BASE_URL = "http://localhost:8000/v1"
 
 
@@ -98,27 +94,19 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                 # Extract the agent's answer
                 agent_answer = message.content
 
-                # Create the embedding vector for the agent's answer
-                embeddings_response = embeddings.embed_query(agent_answer)
-
-                # Retrieve the embedding vector for the agent's answer from the Embed LLM response
-                agent_answer_embedding = embeddings_response
-
-                # Insert the agent's answer and its embedding vector into the database
-                await persist_message(
-                    uuid_work, uuid_lead, "agent", agent_answer, agent_answer_embedding
-                )
-
                 # Display the agent's answer
                 console.print(f"\nAgent:\n{agent_answer}", style="black on white")
 
+                # Insert the agent's answer into the database
+                await persist_message(uuid_work, uuid_lead, "agent", agent_answer)
 
-async def display_similar_messages(similarity_search_results):
-    # Display all similarity search result messages
+
+async def display_memory_retrieved(memory_retrieved):
+    # Display all memory retrieved messages
     # Those will be passed to the LangGraph agent as the system message
 
-    # Create a Rich table to display similarity search results
-    table = Table(title="Similarity Search Results")
+    # Create a Rich table to display memory retrieved
+    table = Table(title="Memory Retrieved")
     table.add_column("#", justify="right", style="cyan", no_wrap=True)
     table.add_column(
         f"Cosine Similarity (>{args.similarity_search_threshold})",
@@ -127,28 +115,27 @@ async def display_similar_messages(similarity_search_results):
     )
     table.add_column("Message", style="green")
 
-    # Add rows to the table for each similarity search result
-    for i, query_result in enumerate(similarity_search_results):
+    # Add rows to the table for each memory retrieved
+    for i, memory_retrieved in enumerate(memory_retrieved):
         table.add_row(
             str(i + 1),
-            f"{query_result['cosine_similarity']:.2f}",
-            query_result["message"],
+            f"{memory_retrieved['cosine_similarity']:.2f}",
+            memory_retrieved["message"],
         )
 
     # Print the table using Rich
     console.print(table)
 
 
-async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
+async def persist_message(uuid_work, uuid_lead, role, text):
     """
-    Sends a request to the FastAPI endpoint to persist a message.
+    Sends a request to the API endpoint to persist a message.
 
     Parameters:
         uuid_work (str): The UUID of the work associated with the message.
         uuid_lead (str): The UUID of the lead associated with the message.
         role (str): The role of the message sender (e.g., 'user', 'agent').
         text (str): The message text.
-        embeddings (vector): The embedding vector of the message.
 
     Returns:
         None
@@ -161,14 +148,13 @@ async def persist_message(uuid_work, uuid_lead, role, text, embeddings):
                 "uuid_lead": uuid_lead,
                 "role": role,
                 "text": text,
-                "embeddings": embeddings,
             },
         )
         response.raise_for_status()
 
 
-async def similarity_search(
-    message_embedding,
+async def retrieve_memory(
+    message,
     similarity_search_threshold,
     similarity_search_limit,
     uuid_work,
@@ -176,10 +162,10 @@ async def similarity_search(
     verbose=False,
 ):
     """
-    Sends a request to the FastAPI endpoint to perform a similarity search.
+    Sends a request to the API endpoint to retrieve memory.
 
     Parameters:
-        message_embedding (vector): The embedding vector of the message.
+        message (str): The message text.
         similarity_search_threshold (float): The threshold of cosine similarity to return from similarity search.
         similarity_search_limit (int): The limit of results to return from similarity search.
         uuid_work (str): The UUID of the work associated with the message.
@@ -190,9 +176,9 @@ async def similarity_search(
     """
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{API_BASE_URL}/similarity_search",
+            f"{API_BASE_URL}/retrieve_memory",
             json={
-                "message_embedding": message_embedding,
+                "message_text": message,
                 "similarity_search_threshold": similarity_search_threshold,
                 "similarity_search_limit": similarity_search_limit,
                 "uuid_work": uuid_work,
@@ -201,12 +187,12 @@ async def similarity_search(
         )
         response.raise_for_status()
 
-        similar_messages = response.json()["results"]
+        memory_retrieved = response.json()["results"]
 
-        if verbose and len(similar_messages) > 0:
-            await display_similar_messages(similar_messages)
+        if verbose and len(memory_retrieved) > 0:
+            await display_memory_retrieved(memory_retrieved)
 
-        return similar_messages
+        return memory_retrieved
 
 
 async def display_agent_messages(messages):
@@ -301,12 +287,9 @@ async def main():
             console.print("\nAgent:\nHave a nice day! :wave:\n", style="black on white")
             break
 
-        # Create the embedding vector for the user's question
-        user_question_embedding = embeddings.embed_query(user_question)
-
-        # Fetch the similarity search results
-        similarity_search_results = await similarity_search(
-            user_question_embedding,
+        # Fetch the memory retrieved
+        memory_retrieved = await retrieve_memory(
+            user_question,
             args.similarity_search_threshold,
             args.similarity_search_limit,
             uuid_work,
@@ -314,24 +297,19 @@ async def main():
             verbose=True,
         )
 
-        # Insert the user's question and its embedding vector into the database
-        await persist_message(
-            uuid_work, uuid_lead, "user", user_question, user_question_embedding
-        )
-
         # Prepare messages (i.e., human and system messages) to be passed to the LangGraph agent
         # Add the user's question to the HumanMessage object
         messages = [HumanMessage(content=user_question)]
 
         # Create a list to store the messages
-        similar_messages = [_["message"] for _ in similarity_search_results]
+        memory_retrieved = [_["message"] for _ in memory_retrieved]
 
         # If there are similar messages returned from the similarity search, add them to the SystemMessage object
-        if len(similar_messages) > 0:
-            join_similar_messages = "\n".join(
-                [f"- {message}" for message in similar_messages]
+        if len(memory_retrieved) > 0:
+            join_memory_retrieved = "\n".join(
+                [f"- {message}" for message in memory_retrieved]
             )
-            system_message = f"To answer the user's question, use this information which is part of the past conversation as a context:\n{join_similar_messages}"
+            system_message = f"To answer the user's question, use this information which is part of the past conversation as a context:\n{join_memory_retrieved}"
             messages.insert(0, SystemMessage(content=system_message))
 
         # Use the new function to prepare and display agent messages

@@ -10,6 +10,8 @@ RUN apk --no-cache update && apk add --no-cache \
     build-base \
     libpq \
     postgresql-dev \
+    rust \
+    cargo \
     && rm -rf /var/cache/apk/*
 
 # Install uv

@@ -749,7 +749,11 @@ source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "langchain" },
+    { name = "langchain-community" },
+    { name = "langchain-openai" },
     { name = "loguru" },
+    { name = "openai" },
     { name = "pgvector" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
@@ -764,7 +768,11 @@ dependencies = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.15.2" },
     { name = "fastapi", specifier = ">=0.115.12" },
+    { name = "langchain", specifier = ">=0.3.23" },
+    { name = "langchain-community", specifier = ">=0.3.21" },
+    { name = "langchain-openai", specifier = ">=0.3.14" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "openai", specifier = ">=1.75.0" },
     { name = "pgvector", specifier = ">=0.4.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.6" },
     { name = "psycopg-pool", specifier = ">=3.0.0" },
