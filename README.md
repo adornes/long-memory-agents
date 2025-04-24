@@ -21,7 +21,7 @@ uv sync
 3. Run the development server:
 
 ```bash
-uv run -- uvicorn main:app --host 0.0.0.0 --port 8000
+uv run -- uvicorn service.main:app --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at:
