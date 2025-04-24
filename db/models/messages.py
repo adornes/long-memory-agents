@@ -5,7 +5,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
 
-class Database:
+class Message:
     def __init__(self):
         self.pool = AsyncConnectionPool(
             conninfo=os.getenv("DATABASE_URL"),

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from pydantic import BaseModel
 
-from database.db import Database
+from db.models.messages import Message
 
 # Load environment variables
 load_dotenv()
@@ -48,7 +48,7 @@ app.add_middleware(
 )
 
 # Initialize database
-database = Database()
+message_db = Message()
 
 
 # Pydantic models for request bodies
@@ -79,7 +79,7 @@ async def health_check():
 @app.post("/persist_message")
 async def persist_message_endpoint(request: PersistMessageRequest):
     try:
-        await database.persist_message(
+        await message_db.persist_message(
             request.uuid_work,
             request.uuid_lead,
             request.role,
@@ -95,7 +95,7 @@ async def persist_message_endpoint(request: PersistMessageRequest):
 @app.post("/similarity_search")
 async def similarity_search_endpoint(request: SimilaritySearchRequest):
     try:
-        results = await database.similarity_search(
+        results = await message_db.similarity_search(
             request.message_embedding,
             request.similarity_search_threshold,
             request.similarity_search_limit,
