@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from db.models.messages import Message
 
-messages_router = APIRouter()
+messages_router = APIRouter(prefix="/v1")
 
 # Initialize database
 message_db = Message()

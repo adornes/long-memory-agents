@@ -46,7 +46,7 @@ llm = init_chat_model("openai:gpt-4o-mini")
 embeddings = OpenAIEmbeddings()
 
 # Define the base URL for the FastAPI server
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://localhost:8000/v1"
 
 
 # Define an async function to process chunks from the agent
