@@ -16,6 +16,9 @@ alembic/.env
 # Database data
 data/
 
+# Logs
+logs/
+
 # Project specific
 *.log
 .DS_Store

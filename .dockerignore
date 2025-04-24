@@ -35,6 +35,9 @@ client/
 # Database data
 data/
 
+# Logs
+logs/
+
 # Environment variables
 .env
 alembic/.env
