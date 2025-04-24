@@ -1,4 +1,4 @@
-"""create_table
+"""messages_table
 
 Revision ID: b55c7932cecb
 Revises:
