@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from langchain_openai import OpenAIEmbeddings
@@ -33,6 +33,15 @@ class RetrieveMemoryRequest(BaseModel):
     uuid_lead: str
 
 
+class RetrievedMessage(BaseModel):
+    message: str
+    cosine_similarity: float
+
+
+class RetrieveMemoryResponse(BaseModel):
+    results: List[RetrievedMessage]
+
+
 # FastAPI endpoints
 @messages_router.post("/persist_message")
 async def persist_message_endpoint(request: PersistMessageRequest):
@@ -41,7 +50,7 @@ async def persist_message_endpoint(request: PersistMessageRequest):
         if not request.embeddings:
             request.embeddings = embeddings.embed_query(request.text)
 
-        await message_db.persist_message(
+        message_db.persist_message(
             request.uuid_work,
             request.uuid_lead,
             request.role,
@@ -62,7 +71,7 @@ async def retrieve_memory_endpoint(request: RetrieveMemoryRequest):
         role = "user"
 
         # Perform similarity search
-        results = await message_db.similarity_search(
+        similar_messages = message_db.similarity_search(
             message_embedding,
             request.similarity_search_threshold,
             request.similarity_search_limit,
@@ -71,7 +80,7 @@ async def retrieve_memory_endpoint(request: RetrieveMemoryRequest):
         )
 
         # Persist the message
-        await message_db.persist_message(
+        message_db.persist_message(
             request.uuid_work,
             request.uuid_lead,
             role,
@@ -79,7 +88,13 @@ async def retrieve_memory_endpoint(request: RetrieveMemoryRequest):
             message_embedding,
         )
 
-        return {"results": results}
+        # Parse the results
+        similar_messages = [
+            RetrievedMessage(message=_[0], cosine_similarity=_[1])
+            for _ in similar_messages
+        ]
+
+        return RetrieveMemoryResponse(results=similar_messages)
     except Exception as e:
         logger.error(f"Error in retrieve_memory: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")

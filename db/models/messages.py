@@ -1,34 +1,46 @@
-import os
 from datetime import datetime
 
-from psycopg.rows import dict_row
-from psycopg_pool import AsyncConnectionPool
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Column, DateTime, Float, String, literal, text
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
+
+from logger_config import logger
+
+from . import Base, SessionLocal
+
+
+class MessageORM(Base):
+    __tablename__ = "messages"
+
+    uuid_work = Column(UUID(as_uuid=True), primary_key=True)
+    uuid_lead = Column(UUID(as_uuid=True), primary_key=True)
+    timestamp = Column(DateTime, nullable=False)
+    role = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    embedding_vector = Column(ARRAY(Float), nullable=False)
 
 
 class Message:
     def __init__(self):
-        self.pool = AsyncConnectionPool(
-            conninfo=os.getenv("DATABASE_URL"),
-            max_size=20,
-            kwargs={
-                "autocommit": True,
-                "prepare_threshold": 0,
-                "row_factory": dict_row,
-            },
+        self.session = SessionLocal()
+
+    def persist_message(self, uuid_work, uuid_lead, role, text, embeddings):
+        logger.info(
+            f"Persisting message for work UUID: {uuid_work} and lead UUID: {uuid_lead}"
         )
-
-    async def persist_message(self, uuid_work, uuid_lead, role, text, embeddings):
         current_timestamp = datetime.now()
-        async with self.pool.connection() as conn:
-            await conn.execute(
-                """
-                INSERT INTO messages (uuid_work, uuid_lead, timestamp, role, message, embedding_vector)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (uuid_work, uuid_lead, current_timestamp, role, text, embeddings),
-            )
+        new_message = MessageORM(
+            uuid_work=uuid_work,
+            uuid_lead=uuid_lead,
+            timestamp=current_timestamp,
+            role=role,
+            message=text,
+            embedding_vector=embeddings,
+        )
+        self.session.add(new_message)
+        self.session.commit()
 
-    async def similarity_search(
+    def similarity_search(
         self,
         message_embedding,
         similarity_search_threshold,
@@ -36,36 +48,31 @@ class Message:
         uuid_work,
         uuid_lead,
     ):
-        async with self.pool.connection() as conn:
-            similarity_search = await conn.execute(
-                """
-                WITH ranked_messages AS (
-                    SELECT
-                        message,
-                        1 - (embedding_vector <=> %s::vector) AS cosine_similarity,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY message
-                            ORDER BY 1 - (embedding_vector <=> %s::vector) DESC
-                        ) as rn
-                    FROM messages
-                    WHERE 1 - (embedding_vector <=> %s::vector) >= %s
-                    AND uuid_work = %s
-                    AND uuid_lead = %s
+        logger.info(
+            f"Performing similarity search for work UUID: {uuid_work} and lead UUID: {uuid_lead}"
+        )
+        query = self.session.query(
+            MessageORM.message,
+            (
+                1
+                - MessageORM.embedding_vector.op("<=>")(
+                    literal(message_embedding, Vector(1536))
                 )
-                SELECT message, cosine_similarity
-                FROM ranked_messages
-                WHERE rn = 1
-                ORDER BY cosine_similarity DESC
-                LIMIT %s;
-                """,
+            ).label("cosine_similarity"),
+        )
+        query = (
+            query.filter(
                 (
-                    message_embedding,
-                    message_embedding,
-                    message_embedding,
-                    similarity_search_threshold,
-                    uuid_work,
-                    uuid_lead,
-                    similarity_search_limit,
-                ),
+                    1
+                    - MessageORM.embedding_vector.op("<=>")(
+                        literal(message_embedding, Vector(1536))
+                    )
+                )
+                >= similarity_search_threshold,
+                MessageORM.uuid_work == uuid_work,
+                MessageORM.uuid_lead == uuid_lead,
             )
-            return await similarity_search.fetchall()
+            .order_by(text("cosine_similarity DESC"))
+            .limit(similarity_search_limit)
+        )
+        return query.all()
