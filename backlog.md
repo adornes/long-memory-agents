@@ -1,6 +1,3 @@
-Add Tavily
-Try Pareto for improving/refactoring the client script
-
 Check alternatives and compare:
 - https://www.getzep.com/
 - https://docs.mem0.ai/platform/overview
