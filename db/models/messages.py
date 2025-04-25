@@ -51,28 +51,22 @@ class Message:
         logger.info(
             f"Performing similarity search for work UUID: {uuid_work} and lead UUID: {uuid_lead}"
         )
-        query = self.session.query(
-            MessageORM.message,
-            (
-                1
-                - MessageORM.embedding_vector.op("<=>")(
-                    literal(message_embedding, Vector(1536))
-                )
-            ).label("cosine_similarity"),
+        cosine_similarity = 1 - MessageORM.embedding_vector.op("<=>")(
+            literal(message_embedding, Vector(1536))
         )
+
         query = (
-            query.filter(
-                (
-                    1
-                    - MessageORM.embedding_vector.op("<=>")(
-                        literal(message_embedding, Vector(1536))
-                    )
-                )
-                >= similarity_search_threshold,
+            self.session.query(
+                MessageORM.message,
+                cosine_similarity.label("cosine_similarity"),
+            )
+            .filter(
+                cosine_similarity >= similarity_search_threshold,
                 MessageORM.uuid_work == uuid_work,
                 MessageORM.uuid_lead == uuid_lead,
             )
             .order_by(text("cosine_similarity DESC"))
             .limit(similarity_search_limit)
         )
+
         return query.all()
