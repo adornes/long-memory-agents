@@ -9,6 +9,7 @@ import httpx
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.schema import HumanMessage, SystemMessage
+from langchain_community.tools.tavily_search.tool import TavilySearchResults
 from langgraph.prebuilt import create_react_agent
 from rich.console import Console, group
 from rich.panel import Panel
@@ -69,8 +70,11 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                     tool_query = tool_arguments["query"]
 
                     console.print(
-                        f"\nThe agent is calling the tool [on deep_sky_blue1]{tool_name}[/on deep_sky_blue1] with the query [on deep_sky_blue1]{tool_query}[/on deep_sky_blue1]. Please wait for the agent's answer[deep_sky_blue1]...[/deep_sky_blue1]",
-                        style="deep_sky_blue1",
+                        Panel.fit(
+                            f"\nThe agent is calling the tool [bright_red]{tool_name}[/bright_red] with the query [bright_red]{tool_query}[/bright_red]. Please wait for the agent's answer...",
+                            title="Tools",
+                            border_style="red",
+                        )
                     )
             else:
                 agent_answer = message.content
@@ -213,7 +217,8 @@ async def main():
         )
     )
 
-    langgraph_agent = create_react_agent(model=llm, tools=[])
+    tavily_tool = TavilySearchResults()
+    langgraph_agent = create_react_agent(model=llm, tools=[tavily_tool])
 
     while True:
         user_question = input("\nUser:\n")

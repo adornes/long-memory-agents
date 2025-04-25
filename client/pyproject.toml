@@ -12,4 +12,5 @@ dependencies = [
     "langgraph>=0.3.31",
     "openai>=1.75.0",
     "rich>=14.0.0",
+    "tavily-python>=0.7.0",
 ]

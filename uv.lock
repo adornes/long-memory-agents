@@ -270,6 +270,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "openai" },
     { name = "rich" },
+    { name = "tavily-python" },
 ]
 
 [package.metadata]
@@ -281,6 +282,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=0.3.31" },
     { name = "openai", specifier = ">=1.75.0" },
     { name = "rich", specifier = ">=14.0.0" },
+    { name = "tavily-python", specifier = ">=0.7.0" },
 ]
 
 [[package]]
@@ -1592,6 +1594,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ce/20/08dfcd9c983f6a6f4a1000d934b9e6d626cff8d2eeb77a89a68eef20a2b7/starlette-0.46.2.tar.gz", hash = "sha256:7f7361f34eed179294600af672f565727419830b54b7b084efe44bb82d2fccd5", size = 2580846 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/0c/9d30a4ebeb6db2b25a841afbb80f6ef9a854fc3b41be131d249a977b4959/starlette-0.46.2-py3-none-any.whl", hash = "sha256:595633ce89f8ffa71a015caed34a5b2dc1c0cdb3f0f1fbd1e69339cf2abeec35", size = 72037 },
+]
+
+[[package]]
+name = "tavily-python"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "requests" },
+    { name = "tiktoken" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e2/d2/6d224fb40f4be1791c100fa64c502e477497d38fffa56cf7ebe293352afb/tavily_python-0.7.0.tar.gz", hash = "sha256:fb5fc0fc04e3f064ed44240463eeacde06d74cd2f4d2033e8aabf0b06a0902b6", size = 16142 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/29/6901ab127a63ff213c8a346698236fd996d0daa6066cd5892390f475eb2f/tavily_python-0.7.0-py3-none-any.whl", hash = "sha256:6697eb18d6e15b64446855c43bc7ae291af009c7b847264082bbfcf6fe4be255", size = 14598 },
 ]
 
 [[package]]
