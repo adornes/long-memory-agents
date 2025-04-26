@@ -248,7 +248,8 @@ async def main():
             join_memory_retrieved = "\n".join(
                 [f"- {message}" for message in memory_retrieved]
             )
-            system_message = f"To answer the user's question, use this information which is part of the past conversation as a context:\n{join_memory_retrieved}"
+            system_message = f"To answer the user's question, use this information which is part of the past conversation as a context:\n{join_memory_retrieved}\n"
+            system_message += "If you need current information, use the internet."
             messages.insert(0, SystemMessage(content=system_message))
 
         if args.verbose:
