@@ -32,6 +32,12 @@ parser.add_argument(
     help="Limit of results to return from similarity search.",
 )
 
+parser.add_argument(
+    "--verbose",
+    action="store_true",
+    help="Display agent's knowledge and tool calls.",
+)
+
 args = parser.parse_args()
 
 # Initialize dotenv to load environment variables
@@ -69,13 +75,14 @@ async def process_chunks(chunk, uuid_work, uuid_lead):
                     tool_arguments = json.loads(tool_call["function"]["arguments"])
                     tool_query = tool_arguments["query"]
 
-                    console.print(
-                        Panel.fit(
-                            f"\nThe agent is calling the tool [bright_red]{tool_name}[/bright_red] with the query [bright_red]{tool_query}[/bright_red]. Please wait for the agent's answer...",
-                            title="Tools",
-                            border_style="red",
+                    if args.verbose:
+                        console.print(
+                            Panel.fit(
+                                f"\nThe agent is calling the tool [bright_red]{tool_name}[/bright_red] with the query [bright_red]{tool_query}[/bright_red]. Please wait for the agent's answer...",
+                                title="Tools",
+                                border_style="red",
+                            )
                         )
-                    )
             else:
                 agent_answer = message.content
                 console.print(f"\nAgent:\n{agent_answer}", style="black on white")
@@ -136,7 +143,6 @@ async def retrieve_memory(
     similarity_search_limit,
     uuid_work,
     uuid_lead,
-    verbose=False,
 ):
     """
     Sends a request to the API endpoint to retrieve memory.
@@ -166,7 +172,7 @@ async def retrieve_memory(
         response.raise_for_status()
         memory_retrieved = response.json()["results"]
 
-        if verbose and memory_retrieved:
+        if args.verbose and memory_retrieved:
             await display_memory_retrieved(memory_retrieved)
 
         return memory_retrieved
@@ -233,7 +239,6 @@ async def main():
             args.similarity_search_limit,
             uuid_work,
             uuid_lead,
-            verbose=True,
         )
 
         messages = [HumanMessage(content=user_question)]
@@ -246,7 +251,8 @@ async def main():
             system_message = f"To answer the user's question, use this information which is part of the past conversation as a context:\n{join_memory_retrieved}"
             messages.insert(0, SystemMessage(content=system_message))
 
-        await display_agent_messages(messages)
+        if args.verbose:
+            await display_agent_messages(messages)
 
         async for chunk in langgraph_agent.astream({"messages": messages}):
             await process_chunks(chunk, uuid_work, uuid_lead)
