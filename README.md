@@ -51,10 +51,20 @@ The API will be available at:
 - Interactive API docs: http://localhost:8000/docs
 - Alternative API docs: http://localhost:8000/redoc
 
-3. Health-check
+4. Health-check
 
 - `GET /health`: Health check endpoint
   - Returns: `{"status": "healthy"}`
+
+## Test it with the client code
+
+In the `client` subdirectory, you'll find a Python client script (`client_with_persistent_memory.py`) that demonstrates the full workflow of the system. This script tests features for persistent memory management and real-time agent interactions.
+
+```bash
+cd client
+uv sync
+uv run client_with_persistent_memory.py
+```
 
 ## Development
 
