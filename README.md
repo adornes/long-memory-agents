@@ -66,6 +66,25 @@ uv sync
 uv run client_with_persistent_memory.py
 ```
 
+The script accepts the following command-line arguments:
+
+- `--similarity-search-threshold`: Sets the minimum cosine similarity score (0.0 to 1.0) for retrieving relevant memories (default: 0.75)
+- `--similarity-search-limit`: Maximum number of similar memories to retrieve (default: 5)
+- `--verbose`: Enables detailed output showing the agent's knowledge and tool calls
+
+Examples:
+
+```bash
+# Run with default settings
+uv run client_with_persistent_memory.py
+
+# Run with a lower similarity threshold and more results
+uv run client_with_persistent_memory.py --similarity-search-threshold 0.6 --similarity-search-limit 10
+
+# Run with verbose output to see agent's reasoning
+uv run client_with_persistent_memory.py --verbose
+```
+
 ## Development
 
 - The project uses FastAPI for the REST API framework
